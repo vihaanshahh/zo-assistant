@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('stealth', {
   resizeOverlay: (size) => ipcRenderer.send('overlay:resize', size),
   onHotkeySubmit: (cb) => ipcRenderer.on('hotkey:submit', cb),
   zoAsk: (input) => ipcRenderer.invoke('zo:ask', input),
+  onZoChunk: (cb) => ipcRenderer.on('zo:chunk', (_, chunk) => cb(chunk)),
+  onZoStatus: (cb) => ipcRenderer.on('zo:status', (_, status) => cb(status)),
+  newConversation: () => ipcRenderer.send('zo:new-conversation'),
   quitApp: () => ipcRenderer.invoke('app:quit'),
 });

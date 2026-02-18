@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { SimpleStore } from './src/utils/simple-store.js';
-import { askZo } from './src/zo.js';
+import { askZoStream } from './src/zo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,6 +15,7 @@ const isMac = process.platform === 'darwin';
 const store = new SimpleStore();
 
 let overlayWin = null;
+let currentConversationId = null;
 
 // App icon
 const appIconPngPath = path.join(__dirname, 'src', 'images', 'icon.png');
@@ -82,6 +83,36 @@ function toggleOverlay() {
   }
 }
 
+function snapToCorner(corner) {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  const point = screen.getCursorScreenPoint();
+  const { workArea } = screen.getDisplayNearestPoint(point);
+  const { width: w, height: h } = overlayWin.getBounds();
+  const margin = 20;
+
+  let x, y;
+  if (corner === 'bottom-left') {
+    x = workArea.x + margin;
+    y = workArea.y + workArea.height - h - margin;
+  } else if (corner === 'top-right') {
+    x = workArea.x + workArea.width - w - margin;
+    y = workArea.y + margin;
+  } else if (corner === 'bottom-right') {
+    x = workArea.x + workArea.width - w - margin;
+    y = workArea.y + workArea.height - h - margin;
+  } else { // top-left
+    x = workArea.x + margin;
+    y = workArea.y + margin;
+  }
+
+  overlayWin.setPosition(Math.round(x), Math.round(y), false);
+  if (!overlayWin.isVisible()) {
+    overlayWin.showInactive();
+    overlayWin.focus();
+    overlayWin.moveTop();
+  }
+}
+
 function registerHotkeys() {
   const hk = store.get('hotkeys') || {};
   globalShortcut.unregisterAll();
@@ -93,6 +124,10 @@ function registerHotkeys() {
   globalShortcut.register(submitCombo, () => {
     overlayWin?.webContents.send('hotkey:submit');
   });
+
+  // Corner snap shortcuts
+  globalShortcut.register('CommandOrControl+Shift+Left', () => snapToCorner('bottom-left'));
+  globalShortcut.register('CommandOrControl+Shift+Right', () => snapToCorner('top-right'));
 }
 
 app.whenReady().then(() => {
@@ -132,16 +167,28 @@ ipcMain.on('overlay:resize', (_evt, size = {}) => {
   }
 });
 
-// IPC: Zo API
+// IPC: Zo API (streaming)
 ipcMain.handle('zo:ask', async (_evt, input) => {
   try {
     const token = store.get('zoToken') || process.env.ZO_ACCESS_TOKEN || '';
-    const output = await askZo(input, token);
-    return { ok: true, output };
+    const { output, conversationId } = await askZoStream(
+      input,
+      token,
+      currentConversationId,
+      (chunk) => overlayWin?.webContents.send('zo:chunk', chunk),
+      (status) => overlayWin?.webContents.send('zo:status', status)
+    );
+    currentConversationId = conversationId;
+    return { ok: true, output, conversationId };
   } catch (e) {
     console.error('[zo:ask]', e);
     return { ok: false, error: String(e) };
   }
+});
+
+// IPC: Reset conversation
+ipcMain.on('zo:new-conversation', () => {
+  currentConversationId = null;
 });
 
 // IPC: Quit

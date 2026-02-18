@@ -1,7 +1,7 @@
 {
-  "name": "quick-zo",
+  "name": "zo",
   "version": "1.0.0",
-  "description": "quick-zo — minimal overlay chat for Zo",
+  "description": "Zo — minimal overlay chat",
   "main": "main.js",
   "type": "module",
   "scripts": {
@@ -21,8 +21,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.quick-zo.app",
-    "productName": "quick-zo",
+    "appId": "com.zo.overlay",
+    "productName": "Zo",
     "directories": {
       "output": "dist"
     },

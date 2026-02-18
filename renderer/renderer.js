@@ -5,7 +5,7 @@ const sendIcon = document.getElementById('send-icon');
 const loadingIcon = document.getElementById('loading-icon');
 const clearBtn = document.getElementById('clear-btn');
 const closeBtn = document.getElementById('close-btn');
-const themeToggle = document.getElementById('theme-toggle');
+const themeBtn = document.getElementById('theme-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const tokenInput = document.getElementById('token-input');
@@ -18,12 +18,17 @@ let isLoading = false;
 function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
   localStorage.setItem('theme', dark ? 'dark' : 'light');
+  const sunIcon = themeBtn.querySelector('.sun-icon');
+  const moonIcon = themeBtn.querySelector('.moon-icon');
+  if (sunIcon) sunIcon.style.display = dark ? '' : 'none';
+  if (moonIcon) moonIcon.style.display = dark ? 'none' : '';
 }
 
+// Default dark; override if user previously chose light
 const savedTheme = localStorage.getItem('theme');
-applyTheme(savedTheme === 'dark');
+applyTheme(savedTheme !== 'light');
 
-themeToggle.addEventListener('click', () => {
+themeBtn.addEventListener('click', () => {
   applyTheme(!document.documentElement.classList.contains('dark'));
 });
 
@@ -52,6 +57,26 @@ window.stealth.getSettings().then(settings => {
   }
 }).catch(() => {});
 
+// ── Streaming ──────────────────────────────────────────────────────────────
+
+let streamBuffer = '';
+
+window.stealth.onZoChunk((chunk) => {
+  streamBuffer += chunk;
+  statusEl.className = '';
+  statusEl.innerHTML = renderMarkdown(streamBuffer);
+  statusEl.scrollTop = statusEl.scrollHeight;
+  adjustHeight();
+});
+
+window.stealth.onZoStatus((status) => {
+  if (isLoading) {
+    statusEl.className = 'processing';
+    statusEl.textContent = status;
+    adjustHeight();
+  }
+});
+
 // ── Submit ─────────────────────────────────────────────────────────────────
 
 async function submit() {
@@ -60,19 +85,26 @@ async function submit() {
   if (!input) return;
 
   isLoading = true;
+  streamBuffer = '';
   setLoading(true);
   promptEl.value = '';
   promptEl.style.height = '';
   sendBtn.classList.remove('has-content');
 
-  showStatus('Asking Zo\u2026', true);
+  // Show a minimal loading indicator
+  statusEl.className = 'processing';
+  statusEl.textContent = 'Thinking…';
+  adjustHeight();
 
   try {
     const res = await window.stealth.zoAsk(input);
-    if (res.ok) {
-      showStatus(res.output, false);
-    } else {
+    if (!res.ok) {
       showError(res.error || 'Something went wrong.');
+    }
+    // Streaming chunks already populated statusEl via onZoChunk.
+    // If no chunks came through (non-streaming fallback), render output.
+    if (res.ok && streamBuffer === '') {
+      showStatus(res.output, false);
     }
   } catch (e) {
     showError(String(e));
@@ -109,7 +141,7 @@ function showError(msg) {
 sendBtn.addEventListener('click', submit);
 
 promptEl.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     submit();
   }
@@ -128,7 +160,9 @@ clearBtn.addEventListener('click', () => {
   statusEl.innerHTML = '';
   promptEl.value = '';
   promptEl.style.height = '';
+  streamBuffer = '';
   sendBtn.classList.remove('has-content');
+  window.stealth.newConversation(); // reset conversation memory in main process
   adjustHeight();
 });
 
