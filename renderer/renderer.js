@@ -10,8 +10,10 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const tokenInput = document.getElementById('token-input');
 const saveTokenBtn = document.getElementById('save-token-btn');
+const stealthToggle = document.getElementById('stealth-toggle');
 
 let isLoading = false;
+let isMiniMode = false;
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,8 @@ saveTokenBtn.addEventListener('click', async () => {
   tokenInput.value = '';
   settingsPanel.classList.remove('open');
   showStatus('Token saved.', false);
+  // Reload available models with new token
+  loadModels().catch(() => {});
 });
 
 // Load existing token hint on start
@@ -56,6 +60,112 @@ window.stealth.getSettings().then(settings => {
     tokenInput.placeholder = '••••••••••••••••• (token saved)';
   }
 }).catch(() => {});
+
+// Load stealth mode setting
+window.stealth.getStealthMode().then(enabled => {
+  stealthToggle.checked = enabled;
+}).catch(() => {});
+
+// Handle stealth mode toggle
+stealthToggle.addEventListener('change', async () => {
+  await window.stealth.setStealthMode(stealthToggle.checked);
+});
+
+// Load available models
+let availableModels = [];
+
+async function loadModels() {
+  const { ok, models } = await window.stealth.getModels();
+  if (ok && models.length > 0) {
+    availableModels = models;
+    const saved = await window.stealth.getModel();
+    renderModelDropdown(saved);
+  }
+}
+
+function renderModelDropdown(selectedValue) {
+  const container = document.getElementById('model-dropdown');
+  const selected = availableModels.find(m => m.model_name === selectedValue);
+  const label = selected ? selected.label : 'Default';
+
+  container.innerHTML = `
+    <div class="dropdown-selected" tabindex="0">
+      <span>${label}</span>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+  `;
+
+  const toggle = container.querySelector('.dropdown-selected');
+  let menu = null;
+
+  function openMenu() {
+    if (menu) return;
+
+    menu = document.createElement('div');
+    menu.className = 'dropdown-menu-fixed';
+    menu.innerHTML = `
+      <div class="dropdown-item${!selectedValue ? ' active' : ''}" data-value="">Default</div>
+      ${availableModels.map(m => `
+        <div class="dropdown-item${m.model_name === selectedValue ? ' active' : ''}" data-value="${m.model_name}">
+          <span class="model-label">${m.label}</span>
+          <span class="model-vendor">${m.vendor || ''}</span>
+        </div>
+      `).join('')}
+    `;
+
+    document.body.appendChild(menu);
+
+    // Position above the toggle
+    const rect = toggle.getBoundingClientRect();
+    menu.style.left = rect.left + 'px';
+    menu.style.width = rect.width + 'px';
+    menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+
+    container.classList.add('open');
+
+    menu.addEventListener('click', async (e) => {
+      const item = e.target.closest('.dropdown-item');
+      if (item) {
+        const value = item.dataset.value;
+        await window.stealth.setModel(value);
+        closeMenu();
+        renderModelDropdown(value);
+      }
+    });
+  }
+
+  function closeMenu() {
+    if (menu) {
+      menu.remove();
+      menu = null;
+    }
+    container.classList.remove('open');
+  }
+
+  toggle.addEventListener('click', () => {
+    if (menu) closeMenu();
+    else openMenu();
+  });
+
+  toggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (menu) closeMenu();
+      else openMenu();
+    }
+    if (e.key === 'Escape') closeMenu();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (menu && !container.contains(e.target) && !menu.contains(e.target)) {
+      closeMenu();
+    }
+  });
+}
+
+loadModels().catch(() => {});
 
 // ── Streaming ──────────────────────────────────────────────────────────────
 
@@ -66,7 +176,11 @@ window.stealth.onZoChunk((chunk) => {
   statusEl.className = '';
   statusEl.innerHTML = renderMarkdown(streamBuffer);
   statusEl.scrollTop = statusEl.scrollHeight;
-  adjustHeight();
+  if (isMiniMode) {
+    adjustMiniHeight();
+  } else {
+    adjustHeight();
+  }
 });
 
 window.stealth.onZoStatus((status) => {
@@ -106,12 +220,16 @@ async function submit() {
     if (res.ok && streamBuffer === '') {
       showStatus(res.output, false);
     }
+    // Final height adjustment for mini mode
+    if (isMiniMode) {
+      setTimeout(adjustMiniHeight, 50);
+    }
   } catch (e) {
     showError(String(e));
   } finally {
     isLoading = false;
     setLoading(false);
-    promptEl.focus();
+    if (!isMiniMode) promptEl.focus();
   }
 }
 
@@ -127,7 +245,11 @@ function showStatus(text, isProcessing) {
     ? `<span class="loading-text">${escapeHtml(text)}</span>`
     : renderMarkdown(text);
   statusEl.scrollTop = statusEl.scrollHeight;
-  adjustHeight();
+  if (isMiniMode) {
+    adjustMiniHeight();
+  } else {
+    adjustHeight();
+  }
 }
 
 function showError(msg) {
@@ -174,6 +296,52 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') window.stealth.toggleOverlay();
 });
 
+// Open external links in default browser
+statusEl.addEventListener('click', (e) => {
+  // In mini mode, clicking expands back to full
+  if (isMiniMode) {
+    setMiniMode(false);
+    return;
+  }
+  const link = e.target.closest('a[data-external="true"]');
+  if (link) {
+    e.preventDefault();
+    const url = link.getAttribute('href');
+    if (url) window.stealth.openExternal(url);
+  }
+});
+
+// ── Mini mode ───────────────────────────────────────────────────────────────
+
+function setMiniMode(mini) {
+  isMiniMode = mini;
+  document.documentElement.classList.toggle('mini-mode', mini);
+
+  if (mini) {
+    // Shrink to banner size and snap to bottom-right
+    setTimeout(() => {
+      const contentHeight = Math.min(180, Math.max(48, statusEl.scrollHeight + 20));
+      window.stealth.resizeOverlay({ width: 340, height: contentHeight, mini: true });
+    }, 10);
+  } else {
+    // Restore full size and recenter
+    window.stealth.resizeOverlay({ width: 760, height: 280, recenter: true });
+    setTimeout(() => {
+      adjustHeight();
+      promptEl.focus();
+    }, 50);
+  }
+}
+
+function adjustMiniHeight() {
+  if (!isMiniMode) return;
+  const contentHeight = Math.min(180, Math.max(48, statusEl.scrollHeight + 20));
+  window.stealth.resizeOverlay({ width: 340, height: contentHeight, mini: true });
+}
+
+window.stealth.onMiniMode(() => setMiniMode(true));
+window.stealth.onFullMode(() => setMiniMode(false));
+
 // ── Height adjustment ──────────────────────────────────────────────────────
 
 function adjustHeight() {
@@ -194,6 +362,13 @@ function escapeHtml(str) {
 }
 
 function renderMarkdown(text) {
+  // First, collect footnote definitions [^1]: url
+  const footnotes = {};
+  text = text.replace(/^\[\^(\w+)\]:\s*(.+)$/gm, (_, id, url) => {
+    footnotes[id] = url.trim();
+    return ''; // Remove the definition line
+  });
+
   let html = escapeHtml(text);
 
   // Fenced code blocks
@@ -207,8 +382,24 @@ function renderMarkdown(text) {
   // Bold
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-  // Italic
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Italic (but not within URLs or already processed)
+  html = html.replace(/(?<![\/:])\*([^*]+)\*(?![\/])/g, '<em>$1</em>');
+
+  // Links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, linkText, url) => {
+    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    return `<a href="${decodedUrl}" data-external="true">${linkText}</a>`;
+  });
+
+  // Footnote references [^1] - convert to links using collected definitions
+  html = html.replace(/\[\^(\w+)\]/g, (_, id) => {
+    const url = footnotes[id];
+    if (url) {
+      const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+      return `<a href="${decodedUrl}" data-external="true" class="footnote-link"></a>`;
+    }
+    return '';
+  });
 
   // Headers
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
@@ -229,6 +420,9 @@ function renderMarkdown(text) {
     return `<ul>${match}</ul>`;
   });
 
+  // Clean up extra whitespace
+  html = html.replace(/\n{3,}/g, '\n\n');
+
   // Paragraphs
   const parts = html.split(/\n\n+/);
   html = parts.map(p => {
@@ -236,7 +430,7 @@ function renderMarkdown(text) {
     if (!p) return '';
     if (/^<(h[1-6]|ul|ol|pre|hr|li)/.test(p)) return p;
     return `<p>${p.replace(/\n/g, '<br>')}</p>`;
-  }).join('');
+  }).filter(p => p).join('');
 
   return html;
 }

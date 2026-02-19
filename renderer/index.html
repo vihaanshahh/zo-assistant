@@ -76,7 +76,7 @@
     /* ── Drag handle ───────────────────────────────────────────────────────── */
     #drag-handle {
       position: absolute;
-      top: 0; left: 0; right: 64px;
+      top: 0; left: 0; right: 120px;
       height: 28px;
       cursor: move;
       -webkit-app-region: drag;
@@ -136,10 +136,12 @@
       padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
+      overflow: visible;
     }
 
     #settings-panel.open { display: block; }
 
+    
     #settings-panel label {
       font-size: 11px;
       color: var(--text-muted);
@@ -164,6 +166,71 @@
 
     #settings-panel input:focus { border-color: var(--border2); }
 
+    /* Custom dropdown */
+    .dropdown {
+      position: relative;
+      width: 100%;
+    }
+
+    .dropdown-selected {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+
+    .dropdown-selected:hover,
+    .dropdown-selected:focus { border-color: var(--border2); }
+
+    .dropdown-selected svg {
+      color: var(--text-muted);
+      transition: transform 0.15s;
+    }
+
+    .dropdown.open .dropdown-selected svg {
+      transform: rotate(180deg);
+    }
+
+    .dropdown-menu-fixed {
+      position: fixed;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 9999;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.25);
+    }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .dropdown-item:hover { background: var(--surface2); }
+    .dropdown-item.active { background: var(--surface2); }
+
+    .dropdown-item .model-label { color: var(--text); }
+    .dropdown-item .model-vendor {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .dropdown-menu::-webkit-scrollbar { width: 4px; }
+    .dropdown-menu::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
     #save-token-btn {
       margin-top: 8px;
       padding: 5px 12px;
@@ -178,6 +245,79 @@
     }
 
     #save-token-btn:hover { opacity: 0.85; }
+
+    /* Toggle switch */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .setting-row label {
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .setting-row .setting-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .toggle input:checked + .toggle-slider:before {
+      transform: translateX(16px);
+      background: var(--accent-fg);
+    }
 
     /* ── Prompt area ───────────────────────────────────────────────────────── */
     #prompt {
@@ -252,7 +392,7 @@
     #status {
       padding: 10px 14px 12px;
       font-size: 13px;
-      line-height: 1.65;
+      line-height: 1.45;
       color: var(--text);
       max-height: 480px;
       overflow-y: auto;
@@ -284,14 +424,44 @@
     #status h2 { font-size: 15px; }
     #status h3, #status h4, #status h5, #status h6 { font-size: 13px; }
 
-    #status p { margin: 6px 0; }
+    #status p { margin: 4px 0; }
     #status p:first-child { margin-top: 0; }
     #status p:last-child { margin-bottom: 0; }
+    #status p:empty { display: none; }
 
-    #status ul, #status ol { margin: 6px 0 6px 18px; padding: 0; }
-    #status li { margin: 3px 0; }
+    #status ul, #status ol { margin: 4px 0 4px 16px; padding: 0; }
+    #status li { margin: 2px 0; line-height: 1.5; }
 
-    #status a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+    #status a {
+      color: var(--text);
+      text-decoration: underline;
+      text-decoration-color: var(--text-muted);
+      text-underline-offset: 2px;
+      cursor: pointer;
+      transition: text-decoration-color 0.15s, opacity 0.15s;
+    }
+
+    #status a:hover {
+      text-decoration-color: var(--text);
+    }
+
+    #status a.footnote-link {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      vertical-align: baseline;
+      margin-left: 1px;
+      opacity: 0.5;
+    }
+
+    #status a.footnote-link::after {
+      content: '↗';
+      font-size: 10px;
+    }
+
+    #status a.footnote-link:hover {
+      opacity: 1;
+    }
 
     #status code {
       font-family: 'Geist Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
@@ -352,6 +522,42 @@
 
     #status strong { font-weight: 600; }
     #status em { font-style: italic; }
+
+    /* ── Mini mode ─────────────────────────────────────────────────────────── */
+    .mini-mode #wrap {
+      border-radius: var(--radius);
+    }
+
+    .mini-mode #top-bar,
+    .mini-mode #settings-panel,
+    .mini-mode #prompt,
+    .mini-mode #bottom-bar,
+    .mini-mode #drag-handle {
+      display: none;
+    }
+
+    .mini-mode #status {
+      display: block !important;
+      border-top: none;
+      max-height: 160px;
+      min-height: 36px;
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      overflow-y: auto;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .mini-mode #status:empty::before {
+      content: 'Zo';
+      color: var(--text-muted);
+    }
+
+    .mini-mode #status.processing {
+      color: var(--text-muted);
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
@@ -399,13 +605,29 @@
       <label>Zo Access Token</label>
       <input type="password" id="token-input" placeholder="zo_sk_..." autocomplete="off" spellcheck="false">
       <button id="save-token-btn">Save token</button>
+
+      <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+        <label style="margin-bottom: 6px;">Model</label>
+        <div id="model-dropdown" class="dropdown"></div>
+      </div>
+
+      <div class="setting-row">
+        <label>
+          Stealth Mode
+          <span class="setting-desc">Hide from screen recording</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="stealth-toggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
 
     <!-- Response -->
     <div id="status"></div>
 
     <!-- Prompt -->
-    <textarea id="prompt" spellcheck="false" placeholder="Ask Zo anything…" autofocus></textarea>
+    <textarea id="prompt" spellcheck="false" placeholder="Ask Zo anything… " autofocus></textarea>
 
     <!-- Bottom bar -->
     <div id="bottom-bar">

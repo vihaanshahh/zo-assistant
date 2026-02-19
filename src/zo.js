@@ -1,24 +1,45 @@
 import fetch from 'node-fetch';
 
-const ZO_ENDPOINT = 'https://api.zo.computer/zo/ask';
-const ZO_MODEL = 'byok:8d8a51c3-2671-4611-82b2-fe85aa91d2a8';
+const ZO_BASE = 'https://api.zo.computer';
+const ZO_ENDPOINT = `${ZO_BASE}/zo/ask`;
+
+/**
+ * Fetch available models from Zo API.
+ */
+export async function getAvailableModels(token) {
+  if (!token) return [];
+  try {
+    const res = await fetch(`${ZO_BASE}/models/available`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (Array.isArray(data)) return data;
+    if (data.models) return data.models;
+    if (data.data) return data.data;
+    if (typeof data === 'object') return Object.values(data);
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
 
 /**
  * Stream a response from Zo via SSE.
- * SSE format from Zo:
- *   event: FrontendModelResponse
- *   data: {"content":"..."}
  *
- *   event: End
- *   data: {"output":"...","conversation_id":"..."}
- *
- * OR flat format with type inside data JSON (handled as fallback).
+ * @param {string} input - Text input
+ * @param {string} token - Zo access token
+ * @param {string|null} conversationId - Existing conversation ID
+ * @param {function} onChunk - Callback for streaming chunks
+ * @param {function} onStatus - Callback for status updates
+ * @param {string|null} modelName - Model to use (optional)
  */
-export async function askZoStream(input, token, conversationId, onChunk, onStatus) {
+export async function askZoStream(input, token, conversationId, onChunk, onStatus, modelName = null) {
   if (!token) throw new Error('Zo access token not set. Open settings (⚙) to add it.');
 
-  const body = { input, model_name: ZO_MODEL, stream: true };
+  const body = { input, stream: true };
   if (conversationId) body.conversation_id = conversationId;
+  if (modelName) body.model_name = modelName;
 
   const MAX_RETRIES = 12;
   const RETRY_DELAY_MS = 2500;

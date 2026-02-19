@@ -8,10 +8,14 @@ A lightweight desktop overlay that lets you chat with Zo from anywhere. Always o
 
 - **Floating Overlay** - Stays above all windows, accessible from any app
 - **Global Hotkey** - Toggle with `Cmd/Ctrl+Shift+Space`
+- **Mini Mode** - Collapse to a small banner while waiting for responses
+- **Model Picker** - Choose from available models in settings
 - **Streaming Responses** - See answers as they're generated
 - **Conversation Memory** - Context maintained across messages
+- **Clickable Links** - Links in responses open in your browser
 - **Dark/Light Theme** - Toggle with one click
 - **Corner Snapping** - Snap to corners with keyboard shortcuts
+- **Stealth Mode** - Hide from screen recording (enabled by default)
 - **Cross-Platform** - macOS, Windows, and Linux
 
 ## Quick Start
@@ -32,6 +36,8 @@ npm start
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl+Shift+Space` | Toggle overlay |
+| `Cmd/Ctrl+Shift+Down` | Mini mode (collapse to banner) |
+| `Cmd/Ctrl+Shift+Up` | Restore from mini mode |
 | `Cmd/Ctrl+Enter` | Submit message |
 | `Cmd/Ctrl+Shift+Left` | Snap to bottom-left |
 | `Cmd/Ctrl+Shift+Right` | Snap to top-right |
@@ -52,6 +58,17 @@ export ZO_ACCESS_TOKEN="zo_sk_..."
 - Click the gear icon in the overlay
 - Enter your Zo access token
 - Click "Save token"
+
+### Model Selection
+
+Choose from your available models in Settings:
+- Click the gear icon
+- Select a model from the dropdown
+- Your selection is saved automatically
+
+### Stealth Mode
+
+When enabled, the overlay is hidden from screen recording and screenshots. Toggle in Settings.
 
 ## Development
 
